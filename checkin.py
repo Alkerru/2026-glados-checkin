@@ -7,7 +7,8 @@
 - 全自动签到
 - 精准获取当前积分 (Points)
 - 积分达标自动兑换会员天数（默认 500 分兑换 100 天，可配置/关闭）
-- PushPlus 微信推送（包含积分、剩余天数、签到结果、兑换结果）
+- 多渠道推送：PushPlus / WxPusher / Server酱 / Telegram，可同时启用
+  （包含积分、剩余天数、签到结果、兑换结果）
 - 智能多域名切换 (优先 glados.cloud)
 - 支持 Cookie-Editor 导出格式
 """
@@ -282,6 +283,74 @@ def pushplus(token, title, content):
         log(f"❌ PushPlus 推送失败: {e}")
         return False
 
+def strip_html(content):
+    """将 HTML 内容转为纯文本（用于 Server酱等 Markdown/纯文本渠道）"""
+    import re
+    text = re.sub(r"<br\s*/?>", "\n", content)
+    text = re.sub(r"<(h3|div|p)[^>]*>", "\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    lines = [line.strip() for line in text.split("\n")]
+    return "\n".join(line for line in lines if line)
+
+def wxpusher_push(app_token, uids_raw, topic_ids_raw, title, content):
+    """WxPusher 推送：APP_TOKEN + UID 或主题 ID，二者至少配一个，支持 HTML"""
+    if not app_token or not (uids_raw or topic_ids_raw):
+        return False
+    try:
+        uids = [u.strip() for u in uids_raw.split(",") if u.strip()] if uids_raw else []
+        topic_ids = []
+        for t in (topic_ids_raw or "").split(","):
+            t = t.strip()
+            if t:
+                topic_ids.append(int(t))
+
+        payload = {
+            "appToken": app_token,
+            "content": content,
+            "summary": title[:99],
+            "contentType": 2,  # 2 = HTML
+        }
+        if uids:
+            payload["uids"] = uids
+        if topic_ids:
+            payload["topicIds"] = topic_ids
+
+        response = requests.post(
+            "https://wxpusher.zjiecode.com/api/send/message",
+            json=payload,
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not data.get("success"):
+            raise RuntimeError(data.get("msg") or f"WxPusher code={data.get('code')}")
+        log("✅ WxPusher 推送成功")
+        return True
+    except (requests.RequestException, ValueError, RuntimeError) as e:
+        log(f"❌ WxPusher 推送失败: {e}")
+        return False
+
+def serverchan_push(sendkey, title, content):
+    """Server酱 Turbo 推送：SendKey 即可，desp 支持 Markdown，转纯文本提交"""
+    if not sendkey:
+        return False
+    try:
+        url = f"https://sctapi.ftqq.com/{sendkey}.send"
+        response = requests.post(
+            url,
+            data={"title": title[:32], "desp": strip_html(content)},
+            timeout=10,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if payload.get("code") != 0:
+            raise RuntimeError(payload.get("message") or f"ServerChan code={payload.get('code')}")
+        log("✅ Server酱 推送成功")
+        return True
+    except (requests.RequestException, ValueError, RuntimeError) as e:
+        log(f"❌ Server酱 推送失败: {e}")
+        return False
+
 def telegram_push(token, chat_id, title, content):
     if not token or not chat_id: return
     try:
@@ -406,8 +475,12 @@ def main():
     ptoken = os.environ.get("PUSHPLUS_TOKEN")
     tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     tg_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
-    
-    if ptoken or (tg_token and tg_chat_id):
+    wx_token = os.environ.get("WXPUSHER_APP_TOKEN")
+    wx_uids = os.environ.get("WXPUSHER_UIDS", "")
+    wx_topics = os.environ.get("WXPUSHER_TOPIC_IDS", "")
+    sc_key = os.environ.get("SERVERCHAN_SENDKEY")
+
+    if ptoken or (tg_token and tg_chat_id) or (wx_token and (wx_uids or wx_topics)) or sc_key:
         title = f"GLaDOS签到: 成功{success_cnt}/{len(cookies)}"
         content = "".join(results)
         content += f"<br><small>时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</small>"
@@ -416,6 +489,10 @@ def main():
             pushplus(ptoken, title, content)
         if tg_token and tg_chat_id:
             telegram_push(tg_token, tg_chat_id, title, content)
+        if wx_token and (wx_uids or wx_topics):
+            wxpusher_push(wx_token, wx_uids, wx_topics, title, content)
+        if sc_key:
+            serverchan_push(sc_key, title, content)
 
     return 0 if success_cnt == len(cookies) else 1
 
