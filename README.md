@@ -140,7 +140,7 @@ GLaDOS 在 2026 年初进行了 API 更新，**绝大多数旧签到脚本已失
 | 🎁 **兑换提示** | 显示当前可兑换选项及差额        |
 | ⏰ **每日一次** | 北京时间 9:30 自动签到          |
 | 🔄 **失败重试** | 最多尝试三次，最终失败才报警    |
-| 📱 **微信推送** | PushPlus 漂亮 HTML 报告         |
+| 📱 **多渠道推送** | PushPlus / WxPusher / Server酱 / Telegram，可同时启用 |
 | ☁️ **2026 API** | 适配最新 glados.cloud API       |
 | 🔧 **持续维护** | 发现问题及时修复                |
 
@@ -156,8 +156,14 @@ GLaDOS 在 2026 年初进行了 API 更新，**绝大多数旧签到脚本已失
 | `PUSHPLUS_TOKEN`     | ❌ 否 | PushPlus 微信推送 Token。                                                  |
 | `TELEGRAM_BOT_TOKEN` | ❌ 否 | Telegram 机器人的 Token（例如 `123456:ABC-DEF1234...`）                    |
 | `TELEGRAM_CHAT_ID`   | ❌ 否 | 接收推送的 Telegram Chat ID                                                |
+| `WXPUSHER_APP_TOKEN` | ❌ 否 | WxPusher 应用的 APP_TOKEN（`AT_` 开头），见 [WxPusher 配置](#-更多推送渠道可选) |
+| `WXPUSHER_UIDS`      | ❌ 否 | WxPusher 接收者 UID（`UID_` 开头），多个用英文逗号分隔                     |
+| `WXPUSHER_TOPIC_IDS` | ❌ 否 | WxPusher 主题 ID（可选，与 UID 二选一或同用），多个用英文逗号分隔          |
+| `SERVERCHAN_SENDKEY` | ❌ 否 | Server酱 Turbo 的 SendKey（`SCT` 开头），见 [Server酱 配置](#-更多推送渠道可选) |
 | `PUSH_LEVEL`         | ❌ 否 | 推送级别：`fail_only`（默认，仅失败推送）或 `all`（每次均推送）            |
 | `EXCHANGE_PLAN`      | ❌ 否 | 积分自动兑换计划（#11）：`plan500`（默认，500 分自动兑换 100 天）、`plan200`（200 分→30 天）、`plan100`（100 分→10 天）或 `off`（关闭）。兑换结果即使 `PUSH_LEVEL=fail_only` 也会推送。 |
+
+> 💡 所有推送渠道都是可选的，配置几个就发几个，互不影响；全都不配则只跑签到不发通知。
 
 ### 🎁 积分自动兑换（#11）
 
@@ -321,6 +327,8 @@ else:
 | `GLADOS_COOKIE`  | 第二步组合的 Cookie      | ✅ 是 |
 | `PUSHPLUS_TOKEN` | 微信推送 Token（见下方） | ❌ 否 |
 
+> 💡 想用 WxPusher 或 Server酱 推送？见下方 [更多推送渠道](#-更多推送渠道可选)。
+
 ---
 
 ### 第四步：获取 PushPlus Token（可选）📱
@@ -338,6 +346,44 @@ else:
 ![获取 Token](images/pushplus-token.png)
 
 5. 将 Token 添加到 GitHub Secrets，Name 填 `PUSHPLUS_TOKEN`
+
+---
+
+### 📱 更多推送渠道（可选）
+
+除了 PushPlus，本项目还支持 **WxPusher**、**Server酱** 和 **Telegram**，可以同时启用多个渠道：
+
+#### WxPusher
+
+1. 访问 [https://wxpusher.zjiecode.com/admin/](https://wxpusher.zjiecode.com/admin/)，微信扫码登录并**创建一个应用**（例如取名 `glados`），获得 `APP_TOKEN`（`AT_` 开头）
+2. 用微信扫描应用页面的二维码**关注该应用**，然后获取你的 UID（两种方式任选）：
+   - 关注微信公众号 `wxpusher`，在「我的」→「我的UID」查看；
+   - 或在管理后台「用户管理」里直接看到关注者的 UID（`UID_` 开头）。
+
+   > ⚠️ 注意：WxPusher 的通知目前主要发到 **WxPusher App**（支持 Android/iOS/鸿蒙/桌面端，应用商店搜索 WxPusher 安装）；微信公众号通道已不是主通道，微信内的 ClawBot 补充渠道有 24 小时 10 条的限制。想要微信内直接收消息，建议搭配 Server酱 使用。
+3. 添加 GitHub Secrets：
+
+| Name | Value |
+| ---- | ----- |
+| `WXPUSHER_APP_TOKEN` | 应用的 APP_TOKEN |
+| `WXPUSHER_UIDS` | 你的 UID（多个用英文逗号分隔） |
+| `WXPUSHER_TOPIC_IDS` | （可选）主题 ID，配合主题订阅使用 |
+
+> UID 与主题 ID 至少配一个，否则 WxPusher 不知道发给谁。
+
+#### Server酱
+
+1. 访问 [https://sct.ftqq.com](https://sct.ftqq.com)，微信扫码登录
+2. 在「SendKey」页面复制你的 SendKey（`SCT` 开头）
+3. 添加 GitHub Secrets：`SERVERCHAN_SENDKEY` = 你的 SendKey
+
+> Server酱 通过微信公众号「方糖」下发，**微信内直接可收**，无需安装任何 App。
+
+#### Telegram
+
+配置 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID` 两个 Secrets（通过 @BotFather 创建机器人获取）。
+
+> 💡 所有渠道均为可选，配几个发几个；全都不配则只跑签到不发通知。
 
 ---
 
@@ -475,10 +521,13 @@ pip install -r requirements.txt
 # 配置 Cookie
 export GLADOS_COOKIE="koa:sess=xxxxxx; koa:sess.sig=yyyyyy"
 
-# 可选：配置推送
+# 可选：配置推送（配几个发几个）
 export PUSH_LEVEL="all"
 export TELEGRAM_BOT_TOKEN="xxx"
 export TELEGRAM_CHAT_ID="yyy"
+export WXPUSHER_APP_TOKEN="AT_xxx"
+export WXPUSHER_UIDS="UID_xxx"
+export SERVERCHAN_SENDKEY="SCT_xxx"
 
 # 执行签到
 python3 checkin.py
@@ -661,7 +710,9 @@ cookie1&cookie2&cookie3
 2. 在 PushPlus 网站测试发送功能是否正常
 3. 查看 Actions 运行日志是否有错误
 
-PushPlus 完全可选，不影响签到。若 PushPlus 当前要求实名认证而你不想认证，可以删除 `PUSHPLUS_TOKEN`，或改用可选的 Telegram 推送；实名认证规则由 PushPlus 决定，本项目无法绕过。
+PushPlus 完全可选，不影响签到。若 PushPlus 当前要求实名认证而你不想认证，可以删除 `PUSHPLUS_TOKEN`，改用 **WxPusher**、**Server酱** 或 Telegram 推送（配置方法见「更多推送渠道」章节）。
+
+> 注意：WxPusher 的通知主要发到 WxPusher App 而不是微信内；想微信内直接收消息请用 Server酱 或 PushPlus。
 
 </details>
 
@@ -719,6 +770,12 @@ GitHub 的 schedule 不是实时调度器：高负载时可能延迟，极端情
 ---
 
 ## 📝 更新日志
+
+### v1.3.0 (2026-09-18)
+
+- 新增 **WxPusher** 推送渠道：配置 `WXPUSHER_APP_TOKEN` + `WXPUSHER_UIDS`（或 `WXPUSHER_TOPIC_IDS`）即可
+- 新增 **Server酱 Turbo** 推送渠道：配置 `SERVERCHAN_SENDKEY` 即可，微信内直接接收
+- 支持多渠道同时推送：PushPlus / WxPusher / Server酱 / Telegram 配几个发几个，互不影响
 
 ### v1.2.0 (2026-08-05)
 
